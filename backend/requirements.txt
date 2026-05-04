@@ -1,0 +1,16 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+httpx>=0.28,<1
+sqlalchemy[asyncio]>=2.0,<3
+asyncpg>=0.30,<1
+polars>=1.0,<2
+pandas>=2.2,<3
+python-dotenv>=1.0,<2
+boto3>=1.35,<2
+playwright>=1.49,<2
+pytrends>=4.9,<5
+pydantic>=2.10,<3
+alembic>=1.14,<2
+celery[redis]>=5.4,<6
+redis>=5.2,<6
+usaddress>=0.5,<1
