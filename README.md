@@ -227,10 +227,55 @@ terraform apply -var="environment=dev"
 
 ---
 
+## Frontend (React + Mapbox)
+
+A 3D interactive map of Brooklyn rendered with Mapbox GL JS in dusk mode. Non-Brooklyn areas are masked with a dark overlay to focus attention on Brooklyn zip codes.
+
+### Running the frontend
+
+```bash
+cd frontend
+cp .env.example .env
+```
+
+Edit `.env` and add your Mapbox access token (free at [account.mapbox.com](https://account.mapbox.com/access-tokens/)).
+
+```bash
+yarn install
+yarn dev
+```
+
+The app will be available at `http://localhost:5173`.
+
+### Frontend structure
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   └── BrooklynMap/        # 3D dusk map with boundary mask
+│   │       ├── BrooklynMap.jsx # Main map component
+│   │       ├── BrooklynMap.css # Map and legend styles
+│   │       ├── maskUtils.js    # Inverted polygon mask builder
+│   │       └── index.js
+│   ├── data/
+│   │   ├── brooklynBoundary.js # Brooklyn GeoJSON boundary + zip codes
+│   │   └── mockProperties.js   # Mock rental property data
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+├── .env.example
+├── index.html
+├── package.json
+└── vite.config.js
+```
+
+---
+
 ## Current Status
 
 **Phase 1 (Foundation):** Complete — 16 free-source extraction clients, bronze storage, 11 silver database schemas, 7 normalizers with BBL-based identity resolution.
 
 **Phase 2 (Intelligence):** Complete — 12 feature calculators (6 property-level, 6 submarket-level), feature store orchestration, source confidence scoring.
 
-**Phase 3 (Surface):** API stubs implemented. Full integration pending.
+**Phase 3 (Surface):** 3D Brooklyn map with dusk mode and boundary masking. Full backend integration pending.
