@@ -1,3 +1,6 @@
+import type { Map } from "mapbox-gl";
+import type { GeoJSONFeature } from "mapbox-gl";
+
 const BASEMAP_FRAGMENT_IMPORT_KEY = "basemap";
 const STANDARD_BUILDING_FEATURESET_IDENTIFIER = "buildings";
 
@@ -7,26 +10,32 @@ const BASELINE_BUILDING_HIGHLIGHT_HEX = "#2e89ff";
 /** Slightly darker, desaturated cue when the pointer rests on any basemap building mass. */
 const SUBDUED_HOVER_BUILDING_TINT_HEX = "#294a73";
 
+export interface AttachStandardBuildingOptions {
+  map: Map;
+  minZoomInteractiveBuildings?: number;
+}
+
+export interface AttachStandardBuildingResult {
+  detachInteractions: () => void;
+  purgeTransientBuildingHighlights: () => void;
+}
+
 /**
  * GL JS ≥3.9 Interactions API: subtle darken Standard `buildings` on hover (`highlight`
- * feature-state + `colorBuildingHighlight`). Volatility greens/reds are applied on Streets
- * fill-extrusion contributors when zoomed in, not via hover coloring.
- *
- * @param {import('mapbox-gl').Map} map
- * @param {object} [options]
- * @param {number} [options.minZoomInteractiveBuildings=12.35]
- * @returns {{ detachInteractions: () => void, purgeTransientBuildingHighlights: () => void }}
+ * feature-state + `colorBuildingHighlight`). Rooftop metric caps use a separate Streets layer.
  */
-export function attachStandardBuildingMockInfluenceInteractions({ map, minZoomInteractiveBuildings = 12.35 }) {
+export function attachStandardBuildingMockInfluenceInteractions({
+  map,
+  minZoomInteractiveBuildings = 12.35,
+}: AttachStandardBuildingOptions): AttachStandardBuildingResult {
   const interactionNamingPrefixMarker = "borough-building-hover";
 
   const mouseEnterInteractionHandle = `${interactionNamingPrefixMarker}-enter`;
   const mouseLeaveInteractionHandle = `${interactionNamingPrefixMarker}-leave`;
 
-  /** @type {import('mapbox-gl').GeoJSONFeature | null} */
-  let lastHoveredBasemapBuildingFeatureRecord = null;
+  let lastHoveredBasemapBuildingFeatureRecord: GeoJSONFeature | null = null;
 
-  function restoreBaselineBuildingHighlightHueObservation() {
+  function restoreBaselineBuildingHighlightHueObservation(): void {
     try {
       map.setConfigProperty(BASEMAP_FRAGMENT_IMPORT_KEY, "colorBuildingHighlight", BASELINE_BUILDING_HIGHLIGHT_HEX);
     } catch {
@@ -34,7 +43,7 @@ export function attachStandardBuildingMockInfluenceInteractions({ map, minZoomIn
     }
   }
 
-  function purgeTransientBuildingHighlightsObservation() {
+  function purgeTransientBuildingHighlightsObservation(): void {
     if (lastHoveredBasemapBuildingFeatureRecord) {
       try {
         map.setFeatureState(lastHoveredBasemapBuildingFeatureRecord, { highlight: false });
@@ -53,13 +62,16 @@ export function attachStandardBuildingMockInfluenceInteractions({ map, minZoomIn
       importId: BASEMAP_FRAGMENT_IMPORT_KEY,
     },
     handler: (interactionPayloadObservation) => {
+      const feature = interactionPayloadObservation.feature;
+      if (!feature) return undefined;
+
       if (map.getZoom() < minZoomInteractiveBuildings) {
         return undefined;
       }
 
       if (
         lastHoveredBasemapBuildingFeatureRecord &&
-        lastHoveredBasemapBuildingFeatureRecord !== interactionPayloadObservation.feature
+        lastHoveredBasemapBuildingFeatureRecord !== feature
       ) {
         try {
           map.setFeatureState(lastHoveredBasemapBuildingFeatureRecord, { highlight: false });
@@ -70,8 +82,8 @@ export function attachStandardBuildingMockInfluenceInteractions({ map, minZoomIn
 
       try {
         map.setConfigProperty(BASEMAP_FRAGMENT_IMPORT_KEY, "colorBuildingHighlight", SUBDUED_HOVER_BUILDING_TINT_HEX);
-        map.setFeatureState(interactionPayloadObservation.feature, { highlight: true });
-        lastHoveredBasemapBuildingFeatureRecord = interactionPayloadObservation.feature;
+        map.setFeatureState(feature, { highlight: true });
+        lastHoveredBasemapBuildingFeatureRecord = feature;
       } catch {
         /* ephemeral style race */
       }
@@ -87,11 +99,18 @@ export function attachStandardBuildingMockInfluenceInteractions({ map, minZoomIn
       importId: BASEMAP_FRAGMENT_IMPORT_KEY,
     },
     handler: (interactionPayloadObservation) => {
+      const feature = interactionPayloadObservation.feature;
+      if (!feature) {
+        lastHoveredBasemapBuildingFeatureRecord = null;
+        restoreBaselineBuildingHighlightHueObservation();
+        return undefined;
+      }
+
       try {
-        map.setFeatureState(interactionPayloadObservation.feature, { highlight: false });
+        map.setFeatureState(feature, { highlight: false });
       } catch {
         try {
-          map.setFeatureState(interactionPayloadObservation.feature, { highlight: false });
+          map.setFeatureState(feature, { highlight: false });
         } catch {
           /* stale */
         }
@@ -104,7 +123,7 @@ export function attachStandardBuildingMockInfluenceInteractions({ map, minZoomIn
     },
   });
 
-  function detachInteractionsManifest() {
+  function detachInteractionsManifest(): void {
     map.removeInteraction(mouseEnterInteractionHandle);
     map.removeInteraction(mouseLeaveInteractionHandle);
     purgeTransientBuildingHighlightsObservation();

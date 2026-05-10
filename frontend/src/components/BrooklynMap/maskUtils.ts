@@ -1,8 +1,10 @@
+import type { Feature, Polygon, Position } from "geojson";
+
 /**
  * Builds a world polygon with inner hole cut out (semi-transparent vignette overlay).
  */
-export function buildOuterMaskGeoJson(inclusiveBrooklynFeature) {
-  const worldBounds = [
+export function buildOuterMaskGeoJson(inclusiveBrooklynFeature: Feature<Polygon>): Feature<Polygon> {
+  const worldBounds: Position[] = [
     [-180, -90],
     [-180, 90],
     [180, 90],
@@ -23,7 +25,7 @@ export function buildOuterMaskGeoJson(inclusiveBrooklynFeature) {
 }
 
 /** Centroid of a closed lng/lat ring (first vertex repeated at end OK). */
-function ringCentroid(ring) {
+function ringCentroid(ring: Position[]): [number, number] {
   const lastIndex = ring.length - 1;
   const dup =
     ring[0][0] === ring[lastIndex][0] && ring[0][1] === ring[lastIndex][1];
@@ -42,14 +44,14 @@ function ringCentroid(ring) {
  * Rough “buffer”: scale each vertex away from centroid so the hole grows.
  * Keeps the outer vignette gradual without GIS dependencies.
  */
-export function scaleInclusiveBrooklynHole(brooklynFeature, scaleFactor) {
+export function scaleInclusiveBrooklynHole(brooklynFeature: Feature<Polygon>, scaleFactor: number): Feature<Polygon> {
   const ring = brooklynFeature.geometry.coordinates[0];
   const centroidPoint = ringCentroid(ring);
 
   const scaledRing = ring.map(([lngPart, latPart]) => [
     centroidPoint[0] + (lngPart - centroidPoint[0]) * scaleFactor,
     centroidPoint[1] + (latPart - centroidPoint[1]) * scaleFactor,
-  ]);
+  ]) as Position[];
 
   const firstPoint = scaledRing[0];
   const lastPoint = scaledRing[scaledRing.length - 1];
@@ -67,25 +69,28 @@ export function scaleInclusiveBrooklynHole(brooklynFeature, scaleFactor) {
   };
 }
 
+export interface FeatherMaskLayerSpec {
+  id: string;
+  data: Feature<Polygon>;
+  fillOpacity: number;
+  fillColor: string;
+}
+
 /**
  * Stacked feather masks — add layers in returned order before the cyan outline on top.
  * Overlap ramps darkness smoothly from borough edge outward.
  */
-export function buildFeatherMaskLayerSpecs(referenceBrooklynFeature) {
+export function buildFeatherMaskLayerSpecs(referenceBrooklynFeature: Feature<Polygon>): FeatherMaskLayerSpec[] {
   return [
     {
       id: "outer-mask-feather-wide",
-      data: buildOuterMaskGeoJson(
-        scaleInclusiveBrooklynHole(referenceBrooklynFeature, 1.065)
-      ),
+      data: buildOuterMaskGeoJson(scaleInclusiveBrooklynHole(referenceBrooklynFeature, 1.065)),
       fillOpacity: 0.32,
       fillColor: "#030712",
     },
     {
       id: "outer-mask-feather-mid",
-      data: buildOuterMaskGeoJson(
-        scaleInclusiveBrooklynHole(referenceBrooklynFeature, 1.038)
-      ),
+      data: buildOuterMaskGeoJson(scaleInclusiveBrooklynHole(referenceBrooklynFeature, 1.038)),
       fillOpacity: 0.28,
       fillColor: "#0a1020",
     },

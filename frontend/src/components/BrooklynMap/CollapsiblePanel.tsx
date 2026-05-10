@@ -1,4 +1,13 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
+
+export interface CollapsiblePanelProps {
+  title: string;
+  summaryCollapsed?: string;
+  defaultExpanded?: boolean;
+  className?: string;
+  disabled?: boolean;
+  children?: ReactNode;
+}
 
 /**
  * Collapsible chrome: expanded shows full content; collapsed keeps a compact header strip.
@@ -10,7 +19,7 @@ export default function CollapsiblePanel({
   className = "",
   disabled = false,
   children,
-}) {
+}: CollapsiblePanelProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const bodySectionId = useId();
 

@@ -1,3 +1,5 @@
+import type { FeatureCollection, Polygon, Position } from "geojson";
+
 /** ~35–45 m half-extent rectangles at Brooklyn latitude — mock tax-lot footprints. */
 const PARCEL_DELTA_LNG = 0.00044;
 const PARCEL_DELTA_LAT = 0.00032;
@@ -5,7 +7,18 @@ const PARCEL_DELTA_LAT = 0.00032;
 /** Streets `within` requires full containment; generous scale helps real footprints intersect mock corridors. */
 const BUILDING_WITHIN_ZONE_SCALE = 5.55;
 
-function rectangularLotRingAroundCenter(centerCoordinates, elongationMeterFactor = 1) {
+export interface MockMarketSample {
+  coordinates: [number, number];
+  rentVolatilityIndex: number;
+  submarket: string;
+  mockParcelLotId: string;
+  footprintAspect?: number;
+}
+
+function rectangularLotRingAroundCenter(
+  centerCoordinates: [number, number],
+  elongationMeterFactor = 1
+): Position[] {
   const [centerLongitude, centerLatitude] = centerCoordinates;
   const halfWidth = PARCEL_DELTA_LNG * elongationMeterFactor;
   const halfHeight = PARCEL_DELTA_LAT;
@@ -19,13 +32,13 @@ function rectangularLotRingAroundCenter(centerCoordinates, elongationMeterFactor
   ];
 }
 
-function rectangularBuildingQueryPolygonAroundSample(sampleRowEntry) {
+function rectangularBuildingQueryPolygonAroundSample(sampleRowEntry: MockMarketSample): Polygon {
   const aspect = sampleRowEntry.footprintAspect ?? 1;
   const [longitude, latitude] = sampleRowEntry.coordinates;
   const halfWidth = PARCEL_DELTA_LNG * aspect * BUILDING_WITHIN_ZONE_SCALE;
   const halfHeight = PARCEL_DELTA_LAT * BUILDING_WITHIN_ZONE_SCALE;
 
-  const ringCoordinates = [
+  const ringCoordinates: Position[] = [
     [longitude - halfWidth, latitude - halfHeight],
     [longitude + halfWidth, latitude - halfHeight],
     [longitude + halfWidth, latitude + halfHeight],
@@ -41,7 +54,7 @@ function rectangularBuildingQueryPolygonAroundSample(sampleRowEntry) {
 
 // Mock sample points plus derived mock parcel footprints for block-level attribution at street zoom.
 // `rentVolatilityIndex` drives both heat blobs and parcel extrusion hue / height.
-export const MOCK_MARKET_SAMPLES = [
+export const MOCK_MARKET_SAMPLES: MockMarketSample[] = [
   {
     coordinates: [-73.9935, 40.6616],
     rentVolatilityIndex: 0.82,
@@ -220,11 +233,11 @@ export const MOCK_MARKET_SAMPLES = [
 ];
 
 /** GeoJSON geometries for styling Streets `composite`/`building` features that lie inside expanded mock lots. */
-export function mockMarketBuildingHighlightGeometries(samples) {
+export function mockMarketBuildingHighlightGeometries(samples: MockMarketSample[]): Polygon[] {
   return samples.map((sampleRowEntry) => rectangularBuildingQueryPolygonAroundSample(sampleRowEntry));
 }
 
-export function samplesToHeatmapGeoJSON(samples) {
+export function samplesToHeatmapGeoJSON(samples: MockMarketSample[]): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: samples.map((rowEntry, zeroBasedIndex) => ({
@@ -243,7 +256,7 @@ export function samplesToHeatmapGeoJSON(samples) {
 }
 
 /** Polygons for mock contributing parcels visible at street zoom alongside GLJS 3D massing. */
-export function samplesToParcelContributionGeoJSON(samples) {
+export function samplesToParcelContributionGeoJSON(samples: MockMarketSample[]): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: samples.map((rowEntry, zeroBasedIndex) => ({
@@ -258,10 +271,7 @@ export function samplesToParcelContributionGeoJSON(samples) {
       geometry: {
         type: "Polygon",
         coordinates: [
-          rectangularLotRingAroundCenter(
-            rowEntry.coordinates,
-            rowEntry.footprintAspect ?? 1
-          ),
+          rectangularLotRingAroundCenter(rowEntry.coordinates, rowEntry.footprintAspect ?? 1),
         ],
       },
     })),

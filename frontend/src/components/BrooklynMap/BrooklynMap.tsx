@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  FillExtrusionLayerSpecification,
+  GeoJSONFeature,
+  HeatmapLayerSpecification,
+} from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import { BROOKLYN_BOUNDARY, BROOKLYN_CENTER } from "../../data/brooklynBoundary";
@@ -8,6 +15,7 @@ import {
   mockMarketBuildingHighlightGeometries,
   samplesToHeatmapGeoJSON,
   samplesToParcelContributionGeoJSON,
+  type MockMarketSample,
 } from "../../data/mockProperties";
 import { attachStandardBuildingMockInfluenceInteractions } from "./influence/attachStandardBuildingMockInfluenceInteractions";
 import {
@@ -28,11 +36,22 @@ const MAP_STYLE_STANDARD = "mapbox://styles/mapbox/standard";
 const DEFAULT_PITCH = 60;
 const DEFAULT_BEARING = -17;
 
+type BoroughMaskHud = {
+  setVeilVisible: (phaseVeilObservationVisible: boolean) => void;
+  purgeInfluenceGlow: () => void;
+};
+
+interface ParcelPopupFields {
+  mockParcelLotId?: string;
+  neighborhood?: string;
+  volatilityLabel?: string;
+}
+
 export default function BrooklynMap() {
-  const mapContainerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const boroughHeatMaskGateRef = useRef(true);
-  const boroughMaskHudRef = useRef({
+  const boroughMaskHudRef = useRef<BoroughMaskHud>({
     setVeilVisible: () => {},
     purgeInfluenceGlow: () => {},
   });
@@ -50,6 +69,10 @@ export default function BrooklynMap() {
       return undefined;
     }
 
+    if (!mapContainerRef.current) {
+      return undefined;
+    }
+
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
     const map = new mapboxgl.Map({
@@ -64,7 +87,7 @@ export default function BrooklynMap() {
 
     mapInstanceRef.current = map;
 
-    let detachInfluenceGlowHandlers = () => {};
+    let detachInfluenceGlowHandlers: () => void = () => {};
 
     map.addControl(
       new mapboxgl.NavigationControl({
@@ -101,7 +124,7 @@ export default function BrooklynMap() {
 
       const outerVeilDescriptors = buildFeatherMaskLayerSpecs(BROOKLYN_BOUNDARY);
 
-      function applyOuterVeilLayerOpacityObservation(phaseVeilObservationVisible) {
+      function applyOuterVeilLayerOpacityObservation(phaseVeilObservationVisible: boolean): void {
         outerVeilDescriptors.forEach((maskSpecItem) => {
           if (!map.getLayer(maskSpecItem.id)) {
             return;
@@ -133,20 +156,20 @@ export default function BrooklynMap() {
         });
       });
 
-      const insightInfluenceGlowBundle = attachStandardBuildingMockInfluenceInteractions({
+      const hoverDimBundleObservation = attachStandardBuildingMockInfluenceInteractions({
         map,
       });
 
-      detachInfluenceGlowHandlers = insightInfluenceGlowBundle.detachInteractions;
+      detachInfluenceGlowHandlers = hoverDimBundleObservation.detachInteractions;
 
       boroughMaskHudRef.current.setVeilVisible = (phaseVeilObservationVisible) => {
         applyOuterVeilLayerOpacityObservation(phaseVeilObservationVisible);
         if (!phaseVeilObservationVisible) {
-          insightInfluenceGlowBundle.purgeTransientBuildingHighlights();
+          hoverDimBundleObservation.purgeTransientBuildingHighlights();
         }
       };
 
-      boroughMaskHudRef.current.purgeInfluenceGlow = insightInfluenceGlowBundle.purgeTransientBuildingHighlights;
+      boroughMaskHudRef.current.purgeInfluenceGlow = hoverDimBundleObservation.purgeTransientBuildingHighlights;
 
       applyOuterVeilLayerOpacityObservation(boroughHeatMaskGateRef.current);
 
@@ -189,10 +212,9 @@ export default function BrooklynMap() {
         defaultExpanded
       >
         <p className="legend-desc">
-          At street zoom you should see vivid rooftop caps above contributor buildings (mock footprints that
-          match Streets geometry): each corridor lands on a distinct hue; calmer mocks skew greener, hotter
-          ones redder. They sit in Standard’s top slot because full extrusions behind photoreal meshes were
-          invisible. Borough heat + hover darken behave as before.
+          At street zoom, vivid rooftop caps mark contributor footprints (metrics via hue). Photoreal Standard
+          massing tint is not overridden globally; hovering a basemap mesh only applies a subtle darken cue.
+          Turn the vignette off to hide the outer heat mask and clear any hover cue.
         </p>
         <label className="legend-heat-veil-toggle">
           <input
@@ -206,7 +228,7 @@ export default function BrooklynMap() {
               boroughMaskHudRef.current.setVeilVisible(veilPhaseObservationEnabled);
             }}
           />{" "}
-          <span>Borough heat mask (dims outer vignette; clears hover darken when off)</span>
+          <span>Borough heat mask (dims vignette; clears hover darken when off)</span>
         </label>
         <p className="legend-metric-buildings-caption">Contributor rooftop caps · metric hue (zoom toward 3D)</p>
         <div className="legend-gradient legend-gradient-metric-buildings" />
@@ -220,7 +242,7 @@ export default function BrooklynMap() {
   );
 }
 
-function addRentMarketHeatLayers(map) {
+function addRentMarketHeatLayers(map: mapboxgl.Map): void {
   const pointGeojson = samplesToHeatmapGeoJSON(MOCK_MARKET_SAMPLES);
   const parcelGeojson = samplesToParcelContributionGeoJSON(MOCK_MARKET_SAMPLES);
   const highlightGeometries = mockMarketBuildingHighlightGeometries(MOCK_MARKET_SAMPLES);
@@ -250,7 +272,7 @@ function addRentMarketHeatLayers(map) {
         0,
         1,
         1.65,
-      ],
+      ] as ExpressionSpecification,
       // Softer blobs when zoomed out; taper before parcel extrusions take over.
       "heatmap-intensity": [
         "interpolate",
@@ -266,7 +288,7 @@ function addRentMarketHeatLayers(map) {
         0.45,
         16.5,
         0.15,
-      ],
+      ] as ExpressionSpecification,
       "heatmap-color": [
         "interpolate",
         ["linear"],
@@ -281,7 +303,7 @@ function addRentMarketHeatLayers(map) {
         "rgba(249, 115, 22, 0.85)",
         1,
         "rgba(239, 68, 68, 0.95)",
-      ],
+      ] as ExpressionSpecification,
       "heatmap-radius": [
         "interpolate",
         ["linear"],
@@ -296,7 +318,7 @@ function addRentMarketHeatLayers(map) {
         55,
         15,
         28,
-      ],
+      ] as ExpressionSpecification,
       "heatmap-opacity": [
         "interpolate",
         ["linear"],
@@ -311,9 +333,20 @@ function addRentMarketHeatLayers(map) {
         0.22,
         16,
         0.06,
-      ],
-      "heatmap-blur": ["interpolate", ["linear"], ["zoom"], 8, 1.35, 12, 1.05, 15, 0.55],
-    },
+      ] as ExpressionSpecification,
+      /** Runtime-supported; omitted from bundled style spec typings. */
+      "heatmap-blur": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        1.35,
+        12,
+        1.05,
+        15,
+        0.55,
+      ] as ExpressionSpecification,
+    } as HeatmapLayerSpecification["paint"],
   });
 
   /*
@@ -321,7 +354,11 @@ function addRentMarketHeatLayers(map) {
    * Rooftop **beacons** (`base` = roof `height`, `height` prop = roof + cap) live in **`top`** slot so they paint
    * over meshes as soon as you zoom into dense 3D.
    */
-  const rooftopElevationMetersExpressionObservation = ["coalesce", ["get", "height"], 14];
+  const rooftopElevationMetersExpressionObservation = [
+    "coalesce",
+    ["get", "height"],
+    14,
+  ] as ExpressionSpecification;
   /* Tall billboard caps (~8–34 m): obvious from pitched street views alongside Standard landmarks. */
   const rooftopBeaconCapElevationSpanMetersExpressionObservation = [
     "interpolate",
@@ -337,12 +374,24 @@ function addRentMarketHeatLayers(map) {
     28,
     16.75,
     34,
-  ];
+  ] as ExpressionSpecification;
   /* Snap opaque quickly once roofs read in 3D; hold at photographic full strength. */
-  const rooftopBeaconRevealOpacityRampObservation = ["interpolate", ["linear"], ["zoom"], 12.72, 0, 12.94, 0.92, 13.15, 1, 17, 1];
+  const rooftopBeaconRevealOpacityRampObservation = [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    12.72,
+    0,
+    12.94,
+    0.92,
+    13.15,
+    1,
+    17,
+    1,
+  ] as ExpressionSpecification;
 
-  const metricContributorHallmarkHueCaseObservation = ["case"];
-  const beaconEmissiveBurstCaseObservation = ["case"];
+  const metricContributorHallmarkHueCaseObservation: unknown[] = ["case"];
+  const beaconEmissiveBurstCaseObservation: unknown[] = ["case"];
 
   MOCK_MARKET_SAMPLES.forEach((sampleRowObservation, corridorIndexObservation) => {
     const perimeterGeometryLiteralObservation = highlightGeometries[corridorIndexObservation];
@@ -361,22 +410,22 @@ function addRentMarketHeatLayers(map) {
   metricContributorHallmarkHueCaseObservation.push(["hsl", 218, 5, 8]);
   beaconEmissiveBurstCaseObservation.push(0);
 
-  const footprintWithinEnvelope = ["any"];
+  const footprintWithinEnvelope: unknown[] = ["any"];
   highlightGeometries.forEach((polygonGeometryLiteral) => {
     footprintWithinEnvelope.push(["within", polygonGeometryLiteral]);
   });
 
-  const streetsBuildingExtrudeFilterExpression = [
+  const streetsBuildingExtrudeFilterExpression: FilterSpecification = [
     "all",
-    footprintWithinEnvelope,
+    footprintWithinEnvelope as ExpressionSpecification,
     [
       "any",
       ["==", ["get", "extrude"], true],
       ["==", ["to-string", ["get", "extrude"]], "true"],
-    ],
-  ];
+    ] as ExpressionSpecification,
+  ] as FilterSpecification;
 
-  const fluxBuildingLayerSpecification = {
+  const fluxBuildingLayerSpecification: FillExtrusionLayerSpecification = {
     id: "rent-market-streets-building-flux",
     type: "fill-extrusion",
     slot: "top",
@@ -384,18 +433,34 @@ function addRentMarketHeatLayers(map) {
     "source-layer": "building",
     filter: streetsBuildingExtrudeFilterExpression,
     minzoom: 12,
+    layout: {
+      "fill-extrusion-edge-radius": 0.22,
+    },
     paint: {
-      "fill-extrusion-color": metricContributorHallmarkHueCaseObservation,
+      "fill-extrusion-color": metricContributorHallmarkHueCaseObservation as ExpressionSpecification,
       "fill-extrusion-base": rooftopElevationMetersExpressionObservation,
-      "fill-extrusion-height": ["+", rooftopElevationMetersExpressionObservation, rooftopBeaconCapElevationSpanMetersExpressionObservation],
+      "fill-extrusion-height": [
+        "+",
+        rooftopElevationMetersExpressionObservation,
+        rooftopBeaconCapElevationSpanMetersExpressionObservation,
+      ] as ExpressionSpecification,
       "fill-extrusion-opacity": rooftopBeaconRevealOpacityRampObservation,
       "fill-extrusion-emissive-strength": [
         "*",
-        ["interpolate", ["linear"], ["zoom"], 12.72, 0, 13.05, 0.92, 13.35, 1],
-        beaconEmissiveBurstCaseObservation,
-      ],
+        [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          12.72,
+          0,
+          13.05,
+          0.92,
+          13.35,
+          1,
+        ] as ExpressionSpecification,
+        beaconEmissiveBurstCaseObservation as ExpressionSpecification,
+      ] as ExpressionSpecification,
       "fill-extrusion-vertical-gradient": false,
-      "fill-extrusion-edge-radius": 0.22,
       "fill-extrusion-ambient-occlusion-intensity": 0.04,
       "fill-extrusion-flood-light-intensity": 0.52,
       "fill-extrusion-flood-light-wall-radius": 18,
@@ -422,7 +487,10 @@ function addRentMarketHeatLayers(map) {
     maxWidth: "280px",
   });
 
-  const openFluxPopupTitle = (mapClickEventLngLatCoordinates, parcelFeatureProperties) =>
+  const openFluxPopupTitle = (
+    mapClickEventLngLatCoordinates: mapboxgl.LngLat,
+    parcelFeatureProperties: ParcelPopupFields
+  ): mapboxgl.Popup =>
     parcelPopup
       .setLngLat(mapClickEventLngLatCoordinates)
       .setHTML(
@@ -438,9 +506,10 @@ function addRentMarketHeatLayers(map) {
     const parcelOverlayPickList = map.queryRenderedFeatures(event.point, {
       layers: ["rent-market-parcel-hit"],
     });
-    const parcelOverlayObservation = parcelOverlayPickList[0]?.properties;
+    const parcelOverlayObservation = pickParcelFields(parcelOverlayPickList[0]);
 
-    const centroidObservation = planarPolygonLikeCentroidLongitudeLatitude(event.features?.[0]?.geometry);
+    const firstMeshFeature = event.features?.[0] as GeoJSONFeature | undefined;
+    const centroidObservation = planarPolygonLikeCentroidLongitudeLatitude(firstMeshFeature?.geometry);
     const referenceLngLongitude = centroidObservation?.lng ?? event.lngLat.lng;
     const referenceLatLatitude = centroidObservation?.lat ?? event.lngLat.lat;
 
@@ -454,10 +523,7 @@ function addRentMarketHeatLayers(map) {
       referenceLatLatitude,
       MOCK_MARKET_SAMPLES
     );
-    openFluxPopupTitle(
-      event.lngLat,
-      synthesizeNearestSamplePopupFields(nearestSampleObservation)
-    );
+    openFluxPopupTitle(event.lngLat, synthesizeNearestSamplePopupFields(nearestSampleObservation));
   });
 
   map.on("mouseenter", "rent-market-streets-building-flux", () => {
@@ -468,9 +534,21 @@ function addRentMarketHeatLayers(map) {
   });
 }
 
+function pickParcelFields(feature: GeoJSONFeature | undefined): ParcelPopupFields | undefined {
+  if (!feature?.properties) return undefined;
+  const p = feature.properties as Record<string, unknown>;
+  return {
+    mockParcelLotId: p.mockParcelLotId != null ? String(p.mockParcelLotId) : undefined,
+    neighborhood: p.neighborhood != null ? String(p.neighborhood) : undefined,
+    volatilityLabel: p.volatilityLabel != null ? String(p.volatilityLabel) : undefined,
+  };
+}
 
-
-function nearestMarketSampleForLngLat(referenceLongitudeDegrees, referenceLatitudeDegrees, marketSampleObservationList) {
+function nearestMarketSampleForLngLat(
+  referenceLongitudeDegrees: number,
+  referenceLatitudeDegrees: number,
+  marketSampleObservationList: MockMarketSample[]
+): MockMarketSample {
   let shortestSeparationSquared = Infinity;
   let closestSampleObservation = marketSampleObservationList[0];
 
@@ -490,7 +568,7 @@ function nearestMarketSampleForLngLat(referenceLongitudeDegrees, referenceLatitu
   return closestSampleObservation;
 }
 
-function synthesizeNearestSamplePopupFields(sampleObservation) {
+function synthesizeNearestSamplePopupFields(sampleObservation: MockMarketSample): ParcelPopupFields {
   return {
     mockParcelLotId: sampleObservation.mockParcelLotId ?? "Nearest mock parcel",
     neighborhood: sampleObservation.submarket ?? "",

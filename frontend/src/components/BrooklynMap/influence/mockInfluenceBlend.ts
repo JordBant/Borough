@@ -1,15 +1,24 @@
+import type { ExpressionSpecification } from "mapbox-gl";
+
 /**
  * Distance helpers and metric→color ramps for mocked parcel-driven building tints.
  */
 
 /** ~Plate-carree planar distance squared in degree² terms (longitude scaled by latitude). */
-export function haversineLikeQuickLngLatDistanceSquaredDegrees(lngFirst, latFirst, lngSecond, latSecond) {
+export function haversineLikeQuickLngLatDistanceSquaredDegrees(
+  lngFirst: number,
+  latFirst: number,
+  lngSecond: number,
+  latSecond: number
+): number {
   const differentialLongitudeScaled = (lngSecond - lngFirst) * Math.cos(((latFirst + latSecond) * Math.PI) / 360);
   const differentialLatitudeDegrees = latSecond - latFirst;
-  return differentialLongitudeScaled * differentialLongitudeScaled + differentialLatitudeDegrees * differentialLatitudeDegrees;
+  return (
+    differentialLongitudeScaled * differentialLongitudeScaled + differentialLatitudeDegrees * differentialLatitudeDegrees
+  );
 }
 
-function clamp01(value) {
+function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
@@ -20,7 +29,10 @@ function clamp01(value) {
  *
  * Caps use high saturation/lightness so they read clearly against Standard night lighting + emissive.
  */
-export function indicativeMetricContributorCapHsl(volatilityObservation, corridorIndexObservation) {
+export function indicativeMetricContributorCapHsl(
+  volatilityObservation: number | undefined,
+  corridorIndexObservation: number
+): ExpressionSpecification {
   const volatilityCoefficient = volatilityObservation ?? 0.56;
   const normalizedStressObservation = clamp01((volatilityCoefficient - 0.35) / 0.62);
 
@@ -34,5 +46,10 @@ export function indicativeMetricContributorCapHsl(volatilityObservation, corrido
   const chromaSaturationSweepPercentObservation = Math.round(93 + volatilityCoefficient * 7);
   const luminanceSweepPercentObservation = Math.round(48 + volatilityCoefficient * 22);
 
-  return ["hsl", compositeHueCircularDegreesObservation, chromaSaturationSweepPercentObservation, luminanceSweepPercentObservation];
+  return [
+    "hsl",
+    compositeHueCircularDegreesObservation,
+    chromaSaturationSweepPercentObservation,
+    luminanceSweepPercentObservation,
+  ];
 }

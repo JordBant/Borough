@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { useState, type RefObject, type ChangeEvent } from "react";
+import type { Map } from "mapbox-gl";
 
 import CollapsiblePanel from "./CollapsiblePanel";
+
+export interface PerspectiveLevelerProps {
+  mapRef: RefObject<Map | null>;
+  enabled: boolean;
+  initialPitch?: number;
+  initialBearing?: number;
+}
 
 /** Bird's-eye / horizon controls: adjust camera pitch and compass bearing. */
 export default function PerspectiveLeveler({
@@ -8,35 +16,35 @@ export default function PerspectiveLeveler({
   enabled,
   initialPitch = 60,
   initialBearing = -17,
-}) {
+}: PerspectiveLevelerProps) {
   const [pitchDegrees, setPitchDegrees] = useState(initialPitch);
   const [bearingDegrees, setBearingDegrees] = useState(initialBearing);
 
-  function applyPerspective(pitch, bearing) {
+  function applyPerspective(pitch: number, bearing: number): void {
     const mapInstance = mapRef.current;
     if (!mapInstance) return;
     mapInstance.jumpTo({ pitch, bearing });
   }
 
-  function handlePitchChange(event) {
+  function handlePitchChange(event: ChangeEvent<HTMLInputElement>): void {
     const value = Number(event.target.value);
     setPitchDegrees(value);
     applyPerspective(value, bearingDegrees);
   }
 
-  function handleBearingChange(event) {
+  function handleBearingChange(event: ChangeEvent<HTMLInputElement>): void {
     const value = Number(event.target.value);
     setBearingDegrees(value);
     applyPerspective(pitchDegrees, value);
   }
 
-  function resetToBirdsEyePlane() {
+  function resetToBirdsEyePlane(): void {
     setPitchDegrees(0);
     setBearingDegrees(0);
     applyPerspective(0, 0);
   }
 
-  function resetBirdsEyeTilt() {
+  function resetBirdsEyeTilt(): void {
     setPitchDegrees(initialPitch);
     setBearingDegrees(initialBearing);
     applyPerspective(initialPitch, initialBearing);
@@ -55,9 +63,9 @@ export default function PerspectiveLeveler({
         <div className="perspective-leveler-row">
           <input
             type="range"
-            min="0"
-            max="85"
-            step="1"
+            min={0}
+            max={85}
+            step={1}
             value={pitchDegrees}
             onChange={handlePitchChange}
           />
@@ -71,9 +79,9 @@ export default function PerspectiveLeveler({
         <div className="perspective-leveler-row">
           <input
             type="range"
-            min="-180"
-            max="180"
-            step="1"
+            min={-180}
+            max={180}
+            step={1}
             value={bearingDegrees}
             onChange={handleBearingChange}
           />

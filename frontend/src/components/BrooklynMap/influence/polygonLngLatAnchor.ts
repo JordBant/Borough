@@ -1,7 +1,18 @@
+import type { Geometry } from "geojson";
+
+export interface LngLatCentroid {
+  lng: number;
+  lat: number;
+}
+
 /** Planar centroid of Polygon / MultiPolygon (first polygon only for multipoly). */
-export function planarPolygonLikeCentroidLongitudeLatitude(geometryObservation) {
+export function planarPolygonLikeCentroidLongitudeLatitude(
+  geometryObservation: Geometry | null | undefined
+): LngLatCentroid | null {
   if (!geometryObservation) return null;
-  if (geometryObservation.type === "Polygon") return polygonOuterRingLongitudeLatitudeAvg(geometryObservation.coordinates?.[0]);
+  if (geometryObservation.type === "Polygon") {
+    return polygonOuterRingLongitudeLatitudeAvg(geometryObservation.coordinates?.[0]);
+  }
   if (geometryObservation.type === "MultiPolygon") {
     const prioritizedPolygonRing = geometryObservation.coordinates?.[0]?.[0];
     return polygonOuterRingLongitudeLatitudeAvg(prioritizedPolygonRing);
@@ -10,11 +21,13 @@ export function planarPolygonLikeCentroidLongitudeLatitude(geometryObservation) 
 }
 
 /** Optional Feature wrapper from Interactions handlers. */
-export function planarFeatureGeometryCentroidLongitudeLatitude(featureObservation) {
+export function planarFeatureGeometryCentroidLongitudeLatitude(featureObservation: {
+  geometry?: Geometry | null;
+} | null): LngLatCentroid | null {
   return planarPolygonLikeCentroidLongitudeLatitude(featureObservation?.geometry);
 }
 
-function polygonOuterRingLongitudeLatitudeAvg(outerRingCoordinates) {
+function polygonOuterRingLongitudeLatitudeAvg(outerRingCoordinates: number[][] | undefined): LngLatCentroid | null {
   if (!outerRingCoordinates?.length) return null;
 
   let sumLongitudeAccumulation = 0;

@@ -1,9 +1,11 @@
+import type { Feature, Polygon } from "geojson";
+
 /**
  * Expanded inclusive Brooklyn borough outline (simplified hull).
  * Covers Greenpoint waterfront, Bergen Beach / Canarsie, Coney peninsula,
  * and Bay Ridge shoreline so more of Kings County reads as “inside.”
  */
-export const BROOKLYN_BOUNDARY = {
+export const BROOKLYN_BOUNDARY: Feature<Polygon> = {
   type: "Feature",
   properties: { borough: "Brooklyn", county: "Kings" },
   geometry: {
@@ -46,6 +48,6 @@ export const BROOKLYN_ZIP_CODES = [
   "11223", "11224", "11225", "11226", "11228", "11229", "11230",
   "11231", "11232", "11233", "11234", "11235", "11236", "11237",
   "11238", "11239", "11249",
-];
+] as const;
 
-export const BROOKLYN_CENTER = [-73.9442, 40.6782];
+export const BROOKLYN_CENTER: [number, number] = [-73.9442, 40.6782];
