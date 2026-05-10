@@ -229,7 +229,7 @@ terraform apply -var="environment=dev"
 
 ## Frontend (React + Mapbox)
 
-A 3D interactive map of Brooklyn rendered with Mapbox GL JS in dusk mode. Non-Brooklyn areas are masked with a dark overlay to focus attention on Brooklyn zip codes.
+A 3D Brooklyn view on **Mapbox Standard** with the **night** light preset (fallback **dusk**) and **`show3dObjects` always on** so buildings stay three-dimensional at every zoom. Outside the borough, **three stacked translucent masks** feather from a light edge tint to a darker far field (less harsh than a single hard cut). Tap the **Perspective** or **Rent fluctuation** headers to collapse their panels.
 
 ### Running the frontend
 
@@ -253,14 +253,15 @@ The app will be available at `http://localhost:5173`.
 frontend/
 ├── src/
 │   ├── components/
-│   │   └── BrooklynMap/        # 3D dusk map with boundary mask
-│   │       ├── BrooklynMap.jsx # Main map component
-│   │       ├── BrooklynMap.css # Map and legend styles
-│   │       ├── maskUtils.js    # Inverted polygon mask builder
+│   │   └── BrooklynMap/             # 3D dusk map, heatmap, boundary mask
+│   │       ├── BrooklynMap.jsx   # Main map + heat layers
+│   │       ├── CollapsiblePanel.jsx # Collapsible headers (perspective + legend)
+│   │       ├── BrooklynMap.css
+│   │       ├── maskUtils.js      # Outer-borough blur mask
 │   │       └── index.js
 │   ├── data/
 │   │   ├── brooklynBoundary.js # Brooklyn GeoJSON boundary + zip codes
-│   │   └── mockProperties.js   # Mock rental property data
+│   │   └── mockProperties.js   # Mock market samples + GeoJSON helper
 │   ├── App.jsx
 │   ├── main.jsx
 │   └── index.css
