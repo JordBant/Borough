@@ -217,6 +217,13 @@
   font-size: 0.8125rem;
 }
 
+.mapboxgl-popup-content .parcel-popup-delta {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0ea5e9;
+}
+
 .legend-desc {
   margin: 0 0 12px 0;
   font-size: 12px;
@@ -258,6 +265,37 @@
 }
 
 .legend-heat-veil-toggle input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.basemap-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 14px 0;
+  padding: 0;
+}
+
+.basemap-toggle-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #a8b0c4;
+  cursor: pointer;
+  user-select: none;
+}
+
+.basemap-toggle-label input {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #5eead4;
+}
+
+.basemap-toggle-label input:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

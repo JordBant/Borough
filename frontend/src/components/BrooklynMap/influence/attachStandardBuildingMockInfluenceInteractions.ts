@@ -1,14 +1,16 @@
 import type { Map } from "mapbox-gl";
 import type { GeoJSONFeature } from "mapbox-gl";
 
+import { BOROUGH_BASEMAP_THEME } from "../../../map/boroughBasemapTheme";
+
 const BASEMAP_FRAGMENT_IMPORT_KEY = "basemap";
 const STANDARD_BUILDING_FEATURESET_IDENTIFIER = "buildings";
 
-/** Default Standard highlight cue (Mapbox demos); restored after hover clears. */
-const BASELINE_BUILDING_HIGHLIGHT_HEX = "#2e89ff";
+/** Default Standard highlight cue; aligned with noir basemap building massing. */
+const BASELINE_BUILDING_HIGHLIGHT_HEX = BOROUGH_BASEMAP_THEME.buildingHighlight;
 
-/** Slightly darker, desaturated cue when the pointer rests on any basemap building mass. */
-const SUBDUED_HOVER_BUILDING_TINT_HEX = "#294a73";
+/** Slightly darker hover cue on mid-grey massing. */
+const SUBDUED_HOVER_BUILDING_TINT_HEX = BOROUGH_BASEMAP_THEME.buildingHover;
 
 export interface AttachStandardBuildingOptions {
   map: Map;

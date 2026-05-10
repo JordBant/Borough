@@ -11,6 +11,9 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 import { BROOKLYN_BOUNDARY, BROOKLYN_CENTER } from "../../data/brooklynBoundary";
 import {
+  computeMetricImpactScore,
+  computeParcelHeatMetadata,
+  deriveParcelTrendFields,
   MOCK_MARKET_SAMPLES,
   mockMarketBuildingHighlightGeometries,
   samplesToHeatmapGeoJSON,
@@ -27,6 +30,16 @@ import CollapsiblePanel from "./CollapsiblePanel";
 import PerspectiveLeveler from "./PerspectiveLeveler";
 import "./BrooklynMap.css";
 import { buildFeatherMaskLayerSpecs } from "./maskUtils";
+import { buildParcelCollectionAlignedToRenderedBuildings } from "./parcelBuildingAlignment";
+import { attachParcelFootprintZoomSync } from "./parcelFootprintZoom";
+import { useBasemapStandardToggles } from "../../hooks/useBasemapStandardToggles";
+import { useParcelHeatExtrusionLayer } from "../../hooks/useParcelHeatExtrusionLayer";
+import {
+  BASEMAP_STANDARD_TOGGLE_UI,
+  DEFAULT_BASEMAP_STANDARD_TOGGLES,
+  type BasemapStandardToggles,
+} from "../../map/basemapStandardToggles";
+import { applyBoroughNoirBasemapTheme, getBoroughMapInitialConfig } from "../../map/boroughBasemapTheme";
 
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -45,6 +58,9 @@ interface ParcelPopupFields {
   mockParcelLotId?: string;
   neighborhood?: string;
   volatilityLabel?: string;
+  trendDeltaLabel?: string;
+  priorVolatilityLabel?: string;
+  metricImpactLabel?: string;
 }
 
 export default function BrooklynMap() {
@@ -58,6 +74,16 @@ export default function BrooklynMap() {
 
   const [controlsReady, setControlsReady] = useState(false);
   const [boroughHeatVeilOn, setBoroughHeatVeilOn] = useState(true);
+  const [basemapToggles, setBasemapToggles] = useState<BasemapStandardToggles>(() => ({
+    ...DEFAULT_BASEMAP_STANDARD_TOGGLES,
+  }));
+
+  useParcelHeatExtrusionLayer(mapInstanceRef, controlsReady, {
+    parcelSourceId: "rent-market-parcels",
+    enabled: true,
+  });
+
+  useBasemapStandardToggles(mapInstanceRef, controlsReady, basemapToggles);
 
   useEffect(() => {
     boroughHeatMaskGateRef.current = boroughHeatVeilOn;
@@ -78,6 +104,7 @@ export default function BrooklynMap() {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: MAP_STYLE_STANDARD,
+      config: getBoroughMapInitialConfig(),
       center: BROOKLYN_CENTER,
       zoom: 11.5,
       pitch: DEFAULT_PITCH,
@@ -99,20 +126,14 @@ export default function BrooklynMap() {
     );
 
     map.on("load", () => {
-      try {
-        map.setConfigProperty("basemap", "lightPreset", "night");
-      } catch {
-        map.setConfigProperty("basemap", "lightPreset", "dusk");
-      }
-
-      map.setConfigProperty("basemap", "show3dObjects", true);
+      applyBoroughNoirBasemapTheme(map);
 
       map.setFog({
-        color: "#0b1021",
-        "high-color": "#1a2d4f",
-        "horizon-blend": 0.42,
-        "space-color": "#000010",
-        "star-intensity": 0.15,
+        color: "#000000",
+        "high-color": "#0c1424",
+        "horizon-blend": 0.35,
+        "space-color": "#000000",
+        "star-intensity": 0.06,
       });
 
       map.addSource("brooklyn-boundary", {
@@ -230,6 +251,34 @@ export default function BrooklynMap() {
           />{" "}
           <span>Borough heat mask (dims vignette; clears hover darken when off)</span>
         </label>
+        <p className="legend-metric-buildings-caption">Basemap (Mapbox Standard)</p>
+        <div className="basemap-toggle-list" aria-label="Basemap layer visibility">
+          {BASEMAP_STANDARD_TOGGLE_UI.map(({ key, label }) => (
+            <label key={key} className="basemap-toggle-label">
+              <input
+                type="checkbox"
+                checked={basemapToggles[key]}
+                disabled={!controlsReady}
+                onChange={(ev) => {
+                  const checked = ev.target.checked;
+                  setBasemapToggles((prev) => ({ ...prev, [key]: checked }));
+                }}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="legend-metric-buildings-caption">
+          Dense pockets: several parcels within ~1–2 short blocks raise shared heat weight; 3D prisms track that
+          intensity per lot.
+        </p>
+        <p className="legend-metric-buildings-caption">
+          Lot impact columns (street zoom): taller, brighter prisms = higher mock metric impact (volatility + Δ).
+        </p>
+        <p className="legend-metric-buildings-caption">
+          Mock lots: each parcel uses a distinct accent; fill/outline strength shows mock volatility{" "}
+          <em>increase</em> (↑), decrease (↓), or steady. Same data powers the heat layer.
+        </p>
         <p className="legend-metric-buildings-caption">Contributor rooftop caps · metric hue (zoom toward 3D)</p>
         <div className="legend-gradient legend-gradient-metric-buildings" />
         <div className="legend-scale legend-scale-tall">
@@ -256,6 +305,21 @@ function addRentMarketHeatLayers(map: mapboxgl.Map): void {
     type: "geojson",
     data: parcelGeojson,
   });
+
+  const parcelTemplateForAlignment = parcelGeojson;
+  const parcelFootprintBaseRef: { current: typeof parcelGeojson } = { current: parcelGeojson };
+
+  const refreshParcelFootprints = attachParcelFootprintZoomSync(map, "rent-market-parcels", () => parcelFootprintBaseRef.current);
+
+  const tryAlignParcelsToBuildings = (): void => {
+    const aligned = buildParcelCollectionAlignedToRenderedBuildings(map, MOCK_MARKET_SAMPLES, parcelTemplateForAlignment);
+    if (!aligned) return;
+    parcelFootprintBaseRef.current = aligned;
+    refreshParcelFootprints();
+  };
+
+  map.once("idle", tryAlignParcelsToBuildings);
+  map.on("zoomend", tryAlignParcelsToBuildings);
 
   map.addLayer({
     id: "rent-market-flux-heat",
@@ -469,6 +533,8 @@ function addRentMarketHeatLayers(map: mapboxgl.Map): void {
 
   map.addLayer(fluxBuildingLayerSpecification);
 
+  addParcelTrendStylingLayers(map);
+
   map.addLayer({
     id: "rent-market-parcel-hit",
     type: "fill",
@@ -498,49 +564,186 @@ function addRentMarketHeatLayers(map: mapboxgl.Map): void {
           <strong>${parcelFeatureProperties.mockParcelLotId ?? "Mock lot"}</strong>
           <div class="parcel-popup-meta">${parcelFeatureProperties.neighborhood ?? ""}</div>
           <div class="parcel-popup-meta">${parcelFeatureProperties.volatilityLabel ?? ""}</div>
+          ${
+            parcelFeatureProperties.trendDeltaLabel
+              ? `<div class="parcel-popup-delta">${parcelFeatureProperties.trendDeltaLabel}</div>`
+              : ""
+          }
+          ${
+            parcelFeatureProperties.priorVolatilityLabel
+              ? `<div class="parcel-popup-meta">${parcelFeatureProperties.priorVolatilityLabel}</div>`
+              : ""
+          }
+          ${
+            parcelFeatureProperties.metricImpactLabel
+              ? `<div class="parcel-popup-meta parcel-popup-impact">${parcelFeatureProperties.metricImpactLabel}</div>`
+              : ""
+          }
         </div>`
       )
       .addTo(map);
 
-  map.on("click", "rent-market-streets-building-flux", (event) => {
-    const parcelOverlayPickList = map.queryRenderedFeatures(event.point, {
+  const rentClickLayers = ["rent-market-parcel-hit", "rent-market-streets-building-flux"];
+
+  map.on("click", (e) => {
+    const hits = map.queryRenderedFeatures(e.point, { layers: rentClickLayers });
+    const top = hits[0];
+    if (!top?.layer?.id) return;
+
+    if (top.layer.id === "rent-market-parcel-hit") {
+      const parcelPick = pickParcelFields(top as GeoJSONFeature);
+      if (parcelPick?.mockParcelLotId) openFluxPopupTitle(e.lngLat, parcelPick);
+      return;
+    }
+
+    const parcelOverlayPickList = map.queryRenderedFeatures(e.point, {
       layers: ["rent-market-parcel-hit"],
     });
     const parcelOverlayObservation = pickParcelFields(parcelOverlayPickList[0]);
 
-    const firstMeshFeature = event.features?.[0] as GeoJSONFeature | undefined;
-    const centroidObservation = planarPolygonLikeCentroidLongitudeLatitude(firstMeshFeature?.geometry);
-    const referenceLngLongitude = centroidObservation?.lng ?? event.lngLat.lng;
-    const referenceLatLatitude = centroidObservation?.lat ?? event.lngLat.lat;
+    const firstMeshFeature = top as GeoJSONFeature;
+    const centroidObservation = planarPolygonLikeCentroidLongitudeLatitude(firstMeshFeature.geometry);
+    const referenceLngLongitude = centroidObservation?.lng ?? e.lngLat.lng;
+    const referenceLatLatitude = centroidObservation?.lat ?? e.lngLat.lat;
 
     if (parcelOverlayObservation?.mockParcelLotId != null && parcelOverlayObservation.volatilityLabel != null) {
-      openFluxPopupTitle(event.lngLat, parcelOverlayObservation);
+      openFluxPopupTitle(e.lngLat, parcelOverlayObservation);
       return;
     }
 
-    const nearestSampleObservation = nearestMarketSampleForLngLat(
+    const nearest = nearestMarketSampleForLngLat(
       referenceLngLongitude,
       referenceLatLatitude,
       MOCK_MARKET_SAMPLES
     );
-    openFluxPopupTitle(event.lngLat, synthesizeNearestSamplePopupFields(nearestSampleObservation));
+    openFluxPopupTitle(e.lngLat, synthesizeNearestSamplePopupFields(nearest.sample, nearest.index));
   });
 
-  map.on("mouseenter", "rent-market-streets-building-flux", () => {
-    map.getCanvas().style.cursor = "pointer";
+  const setRentMarketPointer = (active: boolean) => {
+    map.getCanvas().style.cursor = active ? "pointer" : "";
+  };
+
+  map.on("mouseenter", "rent-market-parcel-hit", () => setRentMarketPointer(true));
+  map.on("mouseleave", "rent-market-parcel-hit", () => setRentMarketPointer(false));
+  map.on("mouseenter", "rent-market-streets-building-flux", () => setRentMarketPointer(true));
+  map.on("mouseleave", "rent-market-streets-building-flux", () => setRentMarketPointer(false));
+}
+
+/** Programmatic parcel/lot chrome from mock heat sample props: distinct accent + rising vs falling band. */
+function addParcelTrendStylingLayers(map: mapboxgl.Map): void {
+  map.addLayer({
+    id: "rent-market-parcel-trend-fill",
+    type: "fill",
+    slot: "top",
+    source: "rent-market-parcels",
+    minzoom: 12,
+    paint: {
+      "fill-color": [
+        "match",
+        ["get", "trendBand"],
+        "rising",
+        ["to-color", ["get", "parcelAccent"]],
+        "falling",
+        "#38bdf8",
+        "#94a3b8",
+      ] as ExpressionSpecification,
+      "fill-opacity": [
+        "match",
+        ["get", "trendBand"],
+        "rising",
+        0.42,
+        "falling",
+        0.2,
+        0.14,
+      ] as ExpressionSpecification,
+    },
   });
-  map.on("mouseleave", "rent-market-streets-building-flux", () => {
-    map.getCanvas().style.cursor = "";
+
+  map.addLayer({
+    id: "rent-market-parcel-trend-outline",
+    type: "line",
+    slot: "top",
+    source: "rent-market-parcels",
+    minzoom: 12,
+    paint: {
+      "line-color": [
+        "match",
+        ["get", "trendBand"],
+        "rising",
+        ["to-color", ["get", "parcelAccent"]],
+        "falling",
+        "#7dd3fc",
+        "#cbd5e1",
+      ] as ExpressionSpecification,
+      "line-width": [
+        "match",
+        ["get", "trendBand"],
+        "rising",
+        2.5,
+        "falling",
+        1.2,
+        1.6,
+      ] as ExpressionSpecification,
+      "line-opacity": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        0.55,
+        13,
+        0.95,
+      ] as ExpressionSpecification,
+    },
+  });
+
+  map.addLayer({
+    id: "rent-market-parcel-trend-labels",
+    type: "symbol",
+    slot: "top",
+    source: "rent-market-parcels",
+    minzoom: 12.4,
+    layout: {
+      "text-field": ["get", "mapLabel"] as ExpressionSpecification,
+      "text-size": 11,
+      "text-offset": [0, 1.15],
+      "text-anchor": "top",
+      "text-max-width": 14,
+    },
+    paint: {
+      "text-color": "#e2e8f0",
+      "text-halo-color": "#0f172a",
+      "text-halo-width": 1.5,
+      "text-halo-blur": 0.5,
+    },
   });
 }
 
 function pickParcelFields(feature: GeoJSONFeature | undefined): ParcelPopupFields | undefined {
   if (!feature?.properties) return undefined;
   const p = feature.properties as Record<string, unknown>;
+  const prior = p.priorVolatility;
+  const priorNum = typeof prior === "number" ? prior : prior != null ? Number(prior) : NaN;
+  const mi = p.metricImpact;
+  const miNum = typeof mi === "number" ? mi : mi != null ? Number(mi) : NaN;
+  const hi = p.heatIntensity;
+  const hiNum = typeof hi === "number" ? hi : hi != null ? Number(hi) : NaN;
+  const neighbors = p.neighborsInRadius;
+  const neighNum = typeof neighbors === "number" ? neighbors : neighbors != null ? Number(neighbors) : NaN;
+
+  const heatParts: string[] = [];
+  if (Number.isFinite(miNum)) heatParts.push(`Impact ${Math.round(miNum * 100)}%`);
+  if (Number.isFinite(hiNum)) heatParts.push(`Heat ${Math.round(hiNum * 100)}%`);
+  if (Number.isFinite(neighNum)) heatParts.push(`${Math.round(neighNum)} nearby ≤130m`);
+
   return {
     mockParcelLotId: p.mockParcelLotId != null ? String(p.mockParcelLotId) : undefined,
     neighborhood: p.neighborhood != null ? String(p.neighborhood) : undefined,
     volatilityLabel: p.volatilityLabel != null ? String(p.volatilityLabel) : undefined,
+    trendDeltaLabel: p.trendDeltaLabel != null ? String(p.trendDeltaLabel) : undefined,
+    priorVolatilityLabel: Number.isFinite(priorNum)
+      ? `Prior mock signal ${Math.round(priorNum * 100)}%`
+      : undefined,
+    metricImpactLabel: heatParts.length > 0 ? heatParts.join(" · ") : undefined,
   };
 }
 
@@ -548,11 +751,11 @@ function nearestMarketSampleForLngLat(
   referenceLongitudeDegrees: number,
   referenceLatitudeDegrees: number,
   marketSampleObservationList: MockMarketSample[]
-): MockMarketSample {
+): { sample: MockMarketSample; index: number } {
   let shortestSeparationSquared = Infinity;
-  let closestSampleObservation = marketSampleObservationList[0];
+  let closestIndex = 0;
 
-  for (const sampleObservation of marketSampleObservationList) {
+  marketSampleObservationList.forEach((sampleObservation, index) => {
     const planarSeparationSquared = haversineLikeQuickLngLatDistanceSquaredDegrees(
       referenceLongitudeDegrees,
       referenceLatitudeDegrees,
@@ -561,17 +764,23 @@ function nearestMarketSampleForLngLat(
     );
     if (planarSeparationSquared < shortestSeparationSquared) {
       shortestSeparationSquared = planarSeparationSquared;
-      closestSampleObservation = sampleObservation;
+      closestIndex = index;
     }
-  }
+  });
 
-  return closestSampleObservation;
+  return { sample: marketSampleObservationList[closestIndex]!, index: closestIndex };
 }
 
-function synthesizeNearestSamplePopupFields(sampleObservation: MockMarketSample): ParcelPopupFields {
+function synthesizeNearestSamplePopupFields(sampleObservation: MockMarketSample, index: number): ParcelPopupFields {
+  const t = deriveParcelTrendFields(sampleObservation, index);
+  const impact = computeMetricImpactScore(sampleObservation, t);
+  const heatMeta = computeParcelHeatMetadata(MOCK_MARKET_SAMPLES)[index]!;
   return {
     mockParcelLotId: sampleObservation.mockParcelLotId ?? "Nearest mock parcel",
     neighborhood: sampleObservation.submarket ?? "",
     volatilityLabel: `${Math.round((sampleObservation.rentVolatilityIndex ?? 0) * 100)}% mock signal`,
+    trendDeltaLabel: t.trendDeltaLabel,
+    priorVolatilityLabel: `Prior mock signal ${Math.round(t.priorVolatility * 100)}%`,
+    metricImpactLabel: `Impact ${Math.round(impact * 100)}% · Heat ${Math.round(heatMeta.heatIntensity * 100)}% (${heatMeta.neighborsInRadius} parcels ≤130m)`,
   };
 }
