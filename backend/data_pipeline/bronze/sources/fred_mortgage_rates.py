@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 
@@ -10,7 +10,7 @@ BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 SERIES_30YR_FIXED_MORTGAGE = "MORTGAGE30US"
 
 
-class FredMortgageRatesExtractor(GovernmentApiClient):
+class FredMortgageRatesExtractor(BaseExtractionClient):
     """Extract 30-year fixed mortgage rate observations from the FRED API."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -29,7 +29,7 @@ class FredMortgageRatesExtractor(GovernmentApiClient):
         if observation_end:
             query_parameters["observation_end"] = observation_end
 
-        response_data = await self.execute_government_request(
+        response_data = await self.execute_get_request(
             BASE_URL,
             query_parameters=query_parameters,
         )

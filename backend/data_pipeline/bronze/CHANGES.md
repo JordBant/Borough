@@ -8,18 +8,17 @@ All 16 data sources are **free and publicly accessible**. The architecture follo
 
 ## Storage
 
-- **Target:** S3-compatible object storage (MinIO for local development, AWS S3 for production)
+- **Target:** AWS S3 (or any S3-compatible object storage)
 - **Format:** JSON envelopes keyed by `{source}/{YYYY}/{MM}/{DD}/{uuid}.json`
 - **Immutability:** Bronze data is append-only. No records are mutated or deleted.
 
 ## Client Abstractions
 
-Three extraction client types, each inheriting from `BaseExtractionClient` (`clients/base_client.py`):
+Two extraction client implementations, keyed by ingestion style:
 
 | Client | Module | Purpose |
 |---|---|---|
-| `GovernmentApiClient` | `clients/government_api_client.py` | NYC Open Data Socrata endpoints and state-level APIs (MTA). Supports app tokens as query params. 60s timeout, 3 retries with exponential backoff. |
-| `FederalApiClient` | `clients/federal_api_client.py` | Federal agency APIs (Census, BLS, FRED, HUD). Same retry/timeout pattern as GovernmentApiClient but separated for clarity. |
+| `BaseExtractionClient` | `clients/base_client.py` | Shared `ExtractGate` (GET via `execute_get_request`, POST via `gate.post`), context manager lifecycle, bronze envelope helpers. NYC Open Data, federal APIs, MTA—all use this with the appropriate `DataSourceName`. |
 | `WebScraperClient` | `clients/web_scraper_client.py` | Playwright-based headless browser for JS-heavy pages. Available as an abstraction but not actively used by any current source. |
 
 `BaseExtractionClient` provides:

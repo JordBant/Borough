@@ -4,14 +4,14 @@ from datetime import datetime, timezone
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.federal_api_client import FederalApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 BASE_URL_TEMPLATE = "https://www.huduser.gov/hudapi/public/fmr/data/{entity_id}"
 
 NYC_METRO_ENTITY_ID = "METRO35620M35620"
 
 
-class HudFairMarketRentsExtractor(FederalApiClient):
+class HudFairMarketRentsExtractor(BaseExtractionClient):
     """Extract HUD Fair Market Rent data for the NYC metro area."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -27,7 +27,7 @@ class HudFairMarketRentsExtractor(FederalApiClient):
 
         query_parameters: dict[str, str] = {"year": year}
 
-        response_data = await self.execute_federal_request(
+        response_data = await self.execute_get_request(
             url,
             query_parameters=query_parameters,
         )

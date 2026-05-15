@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 # NYC Open Data Socrata endpoint for DHCR rent-stabilized buildings
 BASE_URL = "https://data.cityofnewyork.us/resource/tesw-yqqr.json"
 
 
-class NycDhcrExtractor(GovernmentApiClient):
+class NycDhcrExtractor(BaseExtractionClient):
     """Extract rent-stabilized building records from NYC DHCR via Socrata."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -25,7 +25,7 @@ class NycDhcrExtractor(GovernmentApiClient):
             "$offset": offset,
         }
 
-        response_data = await self.execute_government_request(
+        response_data = await self.execute_get_request(
             BASE_URL,
             query_parameters=query_parameters,
         )

@@ -16,7 +16,7 @@ Bronze (Raw Data Lake)  →  Silver (Normalized Postgres)  →  Gold (Feature St
 
 | Layer | Purpose | Storage |
 |---|---|---|
-| **Bronze** | Immutable raw payloads from 16 free public sources | S3 / MinIO (JSON) |
+| **Bronze** | Immutable raw payloads from 16 free public sources | S3 (JSON) |
 | **Silver** | BBL-based entity-resolved records with UUID keys (11 tables) | PostgreSQL |
 | **Gold** | Pre-computed features at property and submarket level (12 calculators) | PostgreSQL |
 
@@ -83,12 +83,10 @@ Borough/
 │   │   └── constants.py        # DataSourceName, BrooklynSubmarket, confidence scores
 │   ├── bronze/                 # Extraction layer (raw data lake)
 │   │   ├── clients/            # Abstracted HTTP clients by source type
-│   │   │   ├── base_client.py
-│   │   │   ├── government_api_client.py  # NYC Open Data / MTA
-│   │   │   ├── federal_api_client.py     # Census / BLS / FRED / HUD
+│   │   │   ├── base_client.py            # ExtractGate + execute_get_request / context manager
 │   │   │   └── web_scraper_client.py     # Playwright (available, not actively used)
 │   │   ├── sources/            # One extractor per data source (16 total)
-│   │   └── storage/            # S3/MinIO bronze object store
+│   │   └── storage/            # S3 bronze object store
 │   ├── silver/                 # Transformation layer (normalized Postgres)
 │   │   ├── database/           # Async SQLAlchemy engine + session management
 │   │   ├── schemas/            # One SQLAlchemy model per table (11 tables)
@@ -117,7 +115,7 @@ Borough/
 
 - **Python 3.11+**
 - **PostgreSQL 15+** (running locally or via Docker)
-- **MinIO** (for local S3-compatible bronze storage) or an AWS account
+- **AWS S3** account (or any S3-compatible store) for bronze payloads
 - **Redis** (for Celery task queue)
 
 ---
@@ -164,13 +162,6 @@ docker run -d --name borough-postgres \
   -p 5432:5432 \
   postgres:15
 
-# MinIO (S3-compatible bronze storage)
-docker run -d --name borough-minio \
-  -e MINIO_ROOT_USER=minioadmin \
-  -e MINIO_ROOT_PASSWORD=minioadmin \
-  -p 9000:9000 -p 9001:9001 \
-  minio/minio server /data --console-address ":9001"
-
 # Redis (Celery broker)
 docker run -d --name borough-redis \
   -p 6379:6379 \
@@ -179,9 +170,32 @@ docker run -d --name borough-redis \
 
 ### 6. Run the API server
 
+**One-liner — starts (or reuses) Postgres, waits until it’s ready, then runs uvicorn.** Run from the **repo root** with the venv active:
+
 ```bash
+docker start borough-postgres 2>/dev/null || docker run -d --name borough-postgres \
+  -e POSTGRES_USER=borough -e POSTGRES_PASSWORD=borough -e POSTGRES_DB=borough \
+  -p 5432:5432 postgres:15 \
+  && until docker exec borough-postgres pg_isready -U borough -d borough -q; do sleep 0.3; done \
+  && uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Stop with `Ctrl-C` (Postgres keeps running). To stop the DB too: `docker stop borough-postgres`.
+
+If Postgres is already up, you can just run uvicorn directly from the **repo root** (so `import backend.…` resolves):
+
+```bash
+cd /path/to/Borough            # repo root, NOT the backend/ subfolder
+source backend/.venv/bin/activate
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Tips:
+
+- Module path is `backend.main:app` (not `main:app`) because everything imports as `from backend.…`.
+- If you’re already inside `backend/`, either `cd ..` first or run `PYTHONPATH=.. uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`.
+- One-liner from anywhere with the venv active: `(cd /path/to/Borough && uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000)`.
+- Verify the venv is active with `which uvicorn` — it should resolve inside `backend/.venv/bin/`.
 
 The API will be available at `http://localhost:8000`. Visit `http://localhost:8000/docs` for the interactive Swagger UI.
 

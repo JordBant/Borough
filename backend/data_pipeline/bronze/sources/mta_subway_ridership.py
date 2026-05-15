@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 BASE_URL = "https://data.ny.gov/resource/wujg-7c2s.json"
 
 
-class MtaSubwayRidershipExtractor(GovernmentApiClient):
+class MtaSubwayRidershipExtractor(BaseExtractionClient):
     """Extract MTA subway ridership data from NY State Open Data."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -36,7 +36,7 @@ class MtaSubwayRidershipExtractor(GovernmentApiClient):
         if where_clauses:
             query_parameters["$where"] = " AND ".join(where_clauses)
 
-        response_data = await self.execute_government_request(
+        response_data = await self.execute_get_request(
             BASE_URL,
             query_parameters=query_parameters,
         )

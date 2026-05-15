@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import abc
+from abc import ABC, abstractmethod
 import logging
 
 from playwright.async_api import async_playwright
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_NAVIGATION_TIMEOUT_MS = 60_000
 
 
-class WebScraperClient(BaseExtractionClient, abc.ABC):
+class WebScraperClient(BaseExtractionClient, ABC):
     """Extraction client for JavaScript-heavy pages that require a real browser."""
 
     def __init__(
@@ -45,7 +45,7 @@ class WebScraperClient(BaseExtractionClient, abc.ABC):
                 await browser.close()
         return html_content
 
-    @abc.abstractmethod
+    @abstractmethod
     def parse_html(self, raw_html: str) -> dict:
         """Parse scraped HTML into a structured dict. Source-specific."""
 

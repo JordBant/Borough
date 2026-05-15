@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 BASE_URL_TEMPLATE = "https://api.census.gov/data/{year}/acs/acs5"
 
@@ -15,7 +15,7 @@ VARIABLE_HOUSEHOLD_COUNT = "B11001_001E"
 VARIABLE_MIGRATION_NET = "B07001_001E"
 
 
-class CensusAcsExtractor(GovernmentApiClient):
+class CensusAcsExtractor(BaseExtractionClient):
     """Extract American Community Survey data from the Census Bureau API."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -40,7 +40,7 @@ class CensusAcsExtractor(GovernmentApiClient):
             "for": f"zip code tabulation area:{zip_code}",
         }
 
-        response_data = await self.execute_government_request(
+        response_data = await self.execute_get_request(
             url,
             query_parameters=query_parameters,
         )

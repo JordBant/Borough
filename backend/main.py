@@ -6,6 +6,9 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 
+from backend.data_pipeline.api.routes._dev_source_test_routes import (
+    dev_source_test_router,
+)
 from backend.db.connection import DatabaseProvider
 
 logger = logging.getLogger("borough")
@@ -25,6 +28,9 @@ app = FastAPI(
     title="Borough — Brooklyn Rental Market Intelligence",
     lifespan=application_lifespan,
 )
+
+# Temporary: per-source smoke-test endpoints; remove this include alongside the file.
+app.include_router(dev_source_test_router)
 
 
 @app.get("/")

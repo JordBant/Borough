@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 BASE_URL = "https://data.cityofnewyork.us/resource/usep-8jbt.json"
 
@@ -13,7 +13,7 @@ RESIDENTIAL_BUILDING_CLASSES = (
 )
 
 
-class NycRollingSalesExtractor(GovernmentApiClient):
+class NycRollingSalesExtractor(BaseExtractionClient):
     """Extract rolling property sales for Brooklyn from NYC Open Data."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -38,7 +38,7 @@ class NycRollingSalesExtractor(GovernmentApiClient):
             "$order": "sale_date DESC",
         }
 
-        response_data = await self.execute_government_request(
+        response_data = await self.execute_get_request(
             BASE_URL,
             query_parameters=query_parameters,
         )

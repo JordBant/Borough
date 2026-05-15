@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
 from backend.data_pipeline.config.extract_gate import RequestParameters
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 BASE_URL = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
 
@@ -13,7 +13,7 @@ BROOKLYN_UNEMPLOYMENT_SERIES = "LAUCN360470000000003"
 BROOKLYN_EMPLOYMENT_SERIES = "LAUCN360470000000005"
 
 
-class BlsEmploymentExtractor(GovernmentApiClient):
+class BlsEmploymentExtractor(BaseExtractionClient):
     """Extract employment and unemployment data from the BLS API.
 
     BLS v2 uses POST with a JSON body. The ExtractGate handles retry logic

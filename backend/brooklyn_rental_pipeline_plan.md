@@ -55,7 +55,7 @@ Ingest → Normalize → Enrich → Feature Engineering → Score (RPS) → Fore
 
 Never mutate. Store untouched source payloads for full replay and audit.
 
-- **Store:** S3-compatible object storage (MinIO self-hosted or Cloudflare R2)
+- **Store:** S3-compatible object storage (AWS S3 or Cloudflare R2)
 - **Format:** JSON blobs
 
 ```json

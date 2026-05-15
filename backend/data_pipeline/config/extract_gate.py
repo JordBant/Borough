@@ -176,7 +176,7 @@ class ExtractGate:
         """
         if self._client is None:
             raise RuntimeError(
-                "ExtractGate HTTP client not initialised — use 'async with' context manager"
+                "Client Manager not initialised"
             )
 
         params = parameters or RequestParameters()
@@ -208,9 +208,7 @@ class ExtractGate:
                 last_exception = exc
                 wait_seconds = _INITIAL_BACKOFF_SECONDS * (2 ** attempt)
                 logger.warning(
-                    "ExtractGate attempt %d/%d failed for %s [%s]: %s — retrying in %.1fs",
-                    attempt + 1,
-                    max_retries,
+                    "Call failed. Retrying in %.1fs",
                     source.value,
                     url,
                     exc,

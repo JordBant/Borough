@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from backend.data_pipeline.config.settings import EnvironmentSettings
 from backend.data_pipeline.config.constants import DataSourceName
-from backend.data_pipeline.bronze.clients.government_api_client import GovernmentApiClient
+from backend.data_pipeline.bronze.clients.base_client import BaseExtractionClient
 
 # NYC Open Data Socrata endpoint for 421-a tax incentive filings
 BASE_URL = "https://data.cityofnewyork.us/resource/y7az-s7wc.json"
 
 
-class Nyc421aFilingsExtractor(GovernmentApiClient):
+class Nyc421aFilingsExtractor(BaseExtractionClient):
     """Extract 421-a tax benefit filings for Brooklyn from NYC Open Data."""
 
     def __init__(self, settings: EnvironmentSettings) -> None:
@@ -25,7 +25,7 @@ class Nyc421aFilingsExtractor(GovernmentApiClient):
             "$offset": offset,
         }
 
-        response_data = await self.execute_government_request(
+        response_data = await self.execute_get_request(
             BASE_URL,
             query_parameters=query_parameters,
         )
